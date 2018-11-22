@@ -26,15 +26,42 @@
         time_t lastsave 上一次RDB的时间
         
         sds aof_buffer aof缓冲区
+        
+        list *clients 一个链表，保存了所有客户端状态。里面存储的是redisClient
+        
+        redis_client *lua_client lua客户端在服务器运行期间
    #####2.1.1 saveparam结构
         time_t seconds 秒数
         int changes 修改数
         
    ##2.2 备注
         默认Redis客户端的目标数据库为0号数据库。可以通过Select进行切换
+
 #3、RedisClient
    ##3.1 结构
         redisDb *db 客户端当前正在使用的数据库
+        
+        int fd 客户端正在使用的套接字描述符
+        
+        一个输入缓冲区
+        sds querybuf 输入缓冲区（可动态伸缩，最大不能超过1G）
+        
+        robj **argv 从输入缓冲区，解析出的命令
+        
+        struct redisCommand *cmd  通过解析出的命令**argvs，从命令表查询得到redisCommand结构
+        
+        两个输出缓冲区
+        char buf[REDIS_REPLY_CHUNK_BYTES] 固定大小缓冲区
+        int bufpos
+        
+        list *reply 链表串联多个字符串对象
+        
+   ##3.2 创建时间
+        客户端使用connect连接的时候，服务端调用 连接事件处理器为 客户端 创建相应的客户端状态
+        并将客户端状态添加到服务器状态结构 clients链表末尾
+        
+        
+
 #4、RedisDb
    ##4.1 结构
         dict *dict 数据库结构其实是维护的一个字典（称为健空间）
@@ -77,7 +104,7 @@
        RDB即将数据库状态落盘
        RDB文件是二进制的，通过它可以还原数据库状态
    ##5.2 命令
-       SAVE 进程阻塞知道RDB文件生成OK
+       SAVE 进程阻塞直到RDB文件生成OK
        BGSAVE 创建子进程，子进程去生成RDB文件
        RDB文件载入是在服务器启动的时候，Redis没有提供专门的命令。注意：如果服务器开启了AOF持久化功能，服务器启动的时候优先使用AOF文件来恢复数据库状态。
        
