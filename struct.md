@@ -30,6 +30,17 @@
         list *clients 一个链表，保存了所有客户端状态。里面存储的是redisClient
         
         redis_client *lua_client lua客户端在服务器运行期间
+        
+        //如果是从服务器
+        char *masterhost
+        int masterport 
+        
+        //保存所有频道的订阅关系,key是频道，value是一个链表，订阅的客户端
+        dict *pubsub_channels
+        
+        //保存所有模式订阅关系，一个链表，每个节点是pubsubPattern结构
+        list *pubsub_patterns
+        
    #####2.1.1 saveparam结构
         time_t seconds 秒数
         int changes 修改数
@@ -56,6 +67,27 @@
         
         list *reply 链表串联多个字符串对象
         
+        //事务相关
+        multiState mstate
+        
+   ###3.1.1 附属结构
+        1.multiState
+            //事务队列，FIFO顺序
+            multiCmd *commands
+            
+            //已入队命令计数
+            int count
+        2.multiCmd
+            //参数
+            robj **argv
+            
+            //参数个数
+            int argc
+            
+            //命令指针
+            struct redisCommand *cmd
+        
+        
    ##3.2 创建时间
         客户端使用connect连接的时候，服务端调用 连接事件处理器为 客户端 创建相应的客户端状态
         并将客户端状态添加到服务器状态结构 clients链表末尾
@@ -65,7 +97,13 @@
 #4、RedisDb
    ##4.1 结构
         dict *dict 数据库结构其实是维护的一个字典（称为健空间）
-        expires *dict 过期字典，保存了所有键的过期时间  
+        expires *dict 过期字典，保存了所有键的过期时间 
+        
+        //watch相关
+        //key是被watch的数据库键，值是一个链表（监视该键的客户端）
+        //当对数据库键对应的值进行变动的时候，会触发touchWatchKey函数，修改监视客户端的标识为（REDIS_DIRTY_CAS）
+        //在执行事务EXEC的时候，客户端的标识不能为REDIS_DIRTY_CAS，否则将决绝事务
+        dict *watched_keys
    ##4.2 备注
         在对键空间进行读操作的时候，服务器会根据键是否存在，记录键空间的命中（hit）和未命中（miss）次数
         在读取一个键以后，会更新LRU（最后一次使用时间）
